@@ -1,0 +1,100 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --adm-color-primary: #2563eb;
+  --adm-color-success: #10b981;
+  --adm-color-warning: #f59e0b;
+  --adm-color-danger: #ef4444;
+  --adm-color-text: #1f2937;
+  --adm-color-text-secondary: #6b7280;
+  --adm-color-fill: #f3f4f6;
+  --adm-color-fill-content: #f9fafb;
+  --adm-color-border: #e5e7eb;
+  --adm-border-radius: 12px;
+  --adm-font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8fafc;
+  --color-accent: #2563eb;
+  --color-accent-light: #dbeafe;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--adm-font-family);
+  background-color: var(--color-bg-secondary);
+  color: var(--adm-color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 모바일 최적화 */
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* 하단 CTA 버튼 영역 공간 확보 */
+.page-content {
+  padding-bottom: 100px;
+}
+
+/* 키워드 태그 스타일 */
+.keyword-tag {
+  @apply inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium;
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+/* 카드 스타일 */
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
+}
+
+/* 그라데이션 배경 */
+.gradient-bg {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #faf5ff 100%);
+}
+
+/* 버튼 애니메이션 */
+.btn-animate {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-animate:active {
+  transform: scale(0.97);
+}
+
+/* 스크롤바 숨기기 (모바일 UX) */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 안전 영역 (노치 대응) */
+.safe-area-bottom {
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.safe-area-top {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+

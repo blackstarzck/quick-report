@@ -8,6 +8,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { BottomCTA } from "@/components/layout/BottomCTA";
@@ -18,9 +19,33 @@ import { reportFormSchema, type ReportFormData } from "@/lib/validators/report";
 import { extractKeywordsAsync } from "@/lib/keywords/extractor";
 import type { Template, PreviousReport, Report } from "@/types/report";
 
+// 노션에 보고서 저장
+async function submitReport(data: {
+  type: string;
+  title: string;
+  content: string;
+  keywords: string[];
+  status: string;
+}): Promise<Report> {
+  const response = await fetch("/api/reports", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error("보고서 저장에 실패했습니다.");
+  }
+
+  return response.json();
+}
+
 function DailyReportNewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { draft, setDraft, clearDraft, setSubmittedReport } =
     useReportDraftStore();
 
@@ -88,26 +113,27 @@ function DailyReportNewContent() {
     setIsSubmitting(true);
 
     try {
-      // AI 키워드 추출 (Mock)
+      // AI 키워드 추출
       const keywords = await extractKeywordsAsync(data.content);
 
-      // 보고서 생성
-      const report: Report = {
-        id: `report-${Date.now()}`,
+      // 노션 데이터베이스에 보고서 저장
+      const report = await submitReport({
         type: "daily",
         title: data.title,
         content: data.content,
         keywords,
-        createdAt: new Date(),
-        updatedAt: new Date(),
         status: "submitted",
-      };
+      });
+
+      // 캐시 무효화 (홈 화면에서 새 데이터 표시)
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
 
       setSubmittedReport(report);
       clearDraft();
 
       router.push("/reports/daily/complete");
-    } catch {
+    } catch (error) {
+      console.error("제출 실패:", error);
       Toast.show({
         content: "제출 중 오류가 발생했습니다",
         position: "bottom",

@@ -1,17 +1,36 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button, Card } from "antd-mobile";
+import { Button, Card, SpinLoading } from "antd-mobile";
 import { EditSOutline, FileOutline, RightOutline } from "antd-mobile-icons";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { ko } from "date-fns/locale";
-import { mockPreviousReports } from "@/lib/mock/data";
 import { KeywordTags } from "@/components/layout/KeywordTags";
+import { useQuery } from "@tanstack/react-query";
+import type { Report } from "@/types/report";
+
+// API에서 보고서 목록 가져오기
+async function fetchReports(): Promise<Report[]> {
+  const response = await fetch("/api/reports");
+  if (!response.ok) {
+    throw new Error("보고서를 불러오는데 실패했습니다.");
+  }
+  return response.json();
+}
 
 export default function HomePage() {
   const router = useRouter();
   const today = new Date();
-  const hasTodayReport = false; // Mock: 오늘 보고 미작성 상태
+  
+  const { data: reports = [], isLoading } = useQuery({
+    queryKey: ["reports"],
+    queryFn: fetchReports,
+  });
+
+  // 오늘 작성한 보고서가 있는지 확인
+  const hasTodayReport = reports.some((report) => 
+    isToday(new Date(report.createdAt))
+  );
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -67,26 +86,43 @@ export default function HomePage() {
           </div>
 
           <div className="space-y-3">
-            {mockPreviousReports.slice(0, 3).map((report) => (
-              <Card
-                key={report.id}
-                className="card cursor-pointer active:bg-gray-50 transition-colors"
-                onClick={() => {}}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileOutline className="text-blue-500" />
-                      <span className="font-semibold text-gray-900">
-                        {format(report.date, "M월 d일 (EEE)", { locale: ko })}
-                      </span>
-                    </div>
-                    <KeywordTags keywords={report.keywords} maxDisplay={4} />
-                  </div>
-                  <RightOutline className="text-gray-400 mt-1" />
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <SpinLoading color="primary" />
+              </div>
+            ) : reports.length === 0 ? (
+              <Card className="card">
+                <div className="text-center py-4 text-gray-500">
+                  아직 작성한 보고가 없습니다.
                 </div>
               </Card>
-            ))}
+            ) : (
+              reports.slice(0, 3).map((report) => (
+                <Card
+                  key={report.id}
+                  className="card cursor-pointer active:bg-gray-50 transition-colors"
+                  onClick={() => router.push(`/reports/${report.id}`)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileOutline className="text-blue-500" />
+                        <span className="font-semibold text-gray-900">
+                          {format(new Date(report.createdAt), "M월 d일 (EEE)", { locale: ko })}
+                        </span>
+                        {report.title && (
+                          <span className="text-gray-600 text-sm truncate max-w-[150px]">
+                            - {report.title}
+                          </span>
+                        )}
+                      </div>
+                      <KeywordTags keywords={report.keywords} maxDisplay={4} />
+                    </div>
+                    <RightOutline className="text-gray-400 mt-1" />
+                  </div>
+                </Card>
+              ))
+            )}
           </div>
         </div>
 

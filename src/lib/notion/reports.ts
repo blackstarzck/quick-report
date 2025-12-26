@@ -1,5 +1,5 @@
 import { queryDatabase, getPage, createPage, updatePage, getDatabaseId } from './client';
-import type { Report, ReportType } from '@/types/report';
+import type { Report, ReportType, ReportSession } from '@/types/report';
 
 // 노션 페이지를 Report 타입으로 변환
 function pageToReport(page: any): Report {
@@ -8,6 +8,7 @@ function pageToReport(page: any): Report {
   return {
     id: page.id,
     type: properties.type?.select?.name || 'daily',
+    session: properties.session?.select?.name as ReportSession | undefined,
     title: properties.Title?.title?.[0]?.plain_text || properties.title?.title?.[0]?.plain_text || '',
     content: properties.content?.rich_text?.[0]?.plain_text || '',
     keywords: properties.keywords?.multi_select?.map((tag: any) => tag.name) || [],
@@ -20,7 +21,7 @@ function pageToReport(page: any): Report {
 // 모든 보고서 조회
 export async function getReports(): Promise<Report[]> {
   const databaseId = getDatabaseId();
-  
+
   const response = await queryDatabase(databaseId, {
     sorts: [
       {
@@ -46,40 +47,50 @@ export async function getReport(pageId: string): Promise<Report | null> {
 // 보고서 생성
 export async function createReport(data: {
   type: ReportType;
+  session?: ReportSession;
   title: string;
   content: string;
   keywords: string[];
   status?: 'draft' | 'submitted';
 }): Promise<Report> {
   const databaseId = getDatabaseId();
-  
+
+  const properties: any = {
+    Title: {
+      title: [
+        {
+          text: { content: data.title },
+        },
+      ],
+    },
+    type: {
+      select: { name: data.type },
+    },
+    content: {
+      rich_text: [
+        {
+          text: { content: data.content },
+        },
+      ],
+    },
+    keywords: {
+      multi_select: data.keywords.map((keyword) => ({ name: keyword })),
+    },
+    status: {
+      select: { name: data.status || 'draft' },
+    },
+  };
+
+  // 일일 보고의 경우 session 필드 추가
+  if (data.session) {
+    properties.session = {
+      select: { name: data.session },
+    };
+  }
+
   const response = await createPage({
     parent: { database_id: databaseId },
-    properties: {
-      Title: {
-        title: [
-          {
-            text: { content: data.title },
-          },
-        ],
-      },
-      type: {
-        select: { name: data.type },
-      },
-      content: {
-        rich_text: [
-          {
-            text: { content: data.content },
-          },
-        ],
-      },
-      keywords: {
-        multi_select: data.keywords.map((keyword) => ({ name: keyword })),
-      },
-      status: {
-        select: { name: data.status || 'draft' },
-      },
-    },
+    properties,
   });
 
   return pageToReport(response);
@@ -90,6 +101,7 @@ export async function updateReportData(
   pageId: string,
   data: Partial<{
     type: ReportType;
+    session: ReportSession;
     title: string;
     content: string;
     keywords: string[];
@@ -107,6 +119,12 @@ export async function updateReportData(
   if (data.type !== undefined) {
     properties.type = {
       select: { name: data.type },
+    };
+  }
+
+  if (data.session !== undefined) {
+    properties.session = {
+      select: { name: data.session },
     };
   }
 

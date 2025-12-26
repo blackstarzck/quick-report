@@ -8,7 +8,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { BottomCTA } from "@/components/layout/BottomCTA";
@@ -17,11 +17,21 @@ import { PreviousReportBottomSheet } from "@/components/report/PreviousReportBot
 import { useReportDraftStore } from "@/store/reportDraft.store";
 import { reportFormSchema, type ReportFormData } from "@/lib/validators/report";
 import { extractKeywordsAsync } from "@/lib/keywords/extractor";
-import type { Template, PreviousReport, Report } from "@/types/report";
+import type { Template, PreviousReport, Report, ReportSession } from "@/types/report";
+
+// 보고서 조회
+async function fetchReport(id: string): Promise<Report> {
+  const response = await fetch(`/api/reports/${id}`);
+  if (!response.ok) {
+    throw new Error("보고서를 불러오는데 실패했습니다.");
+  }
+  return response.json();
+}
 
 // 노션에 보고서 저장
 async function submitReport(data: {
   type: string;
+  session?: ReportSession;
   title: string;
   content: string;
   keywords: string[];
@@ -42,6 +52,28 @@ async function submitReport(data: {
   return response.json();
 }
 
+// 보고서 수정
+async function updateReport(id: string, data: {
+  title: string;
+  content: string;
+  keywords: string[];
+  status: string;
+}): Promise<Report> {
+  const response = await fetch(`/api/reports/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error("보고서 수정에 실패했습니다.");
+  }
+
+  return response.json();
+}
+
 function DailyReportNewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,15 +84,29 @@ function DailyReportNewContent() {
   const [templateSheetVisible, setTemplateSheetVisible] = useState(false);
   const [previousSheetVisible, setPreviousSheetVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditDataLoaded, setIsEditDataLoaded] = useState(false);
 
   const today = new Date();
   const defaultTitle = format(today, "M월 d일 업무 보고", { locale: ko });
+
+  // 수정 모드 및 세션 파라미터 확인
+  const editId = searchParams.get("edit");
+  const sessionParam = searchParams.get("session") as ReportSession | null;
+  const isEditMode = !!editId;
+
+  // 수정할 보고서 조회
+  const { data: editReport, isLoading: isLoadingEdit } = useQuery({
+    queryKey: ["report", editId],
+    queryFn: () => fetchReport(editId!),
+    enabled: isEditMode,
+  });
 
   const {
     control,
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isValid },
   } = useForm<ReportFormData>({
     resolver: zodResolver(reportFormSchema),
@@ -74,10 +120,23 @@ function DailyReportNewContent() {
   const content = watch("content");
   const title = watch("title");
 
-  // 초안 자동 저장
+  // 수정 모드: 기존 보고서 데이터로 폼 초기화
   useEffect(() => {
-    setDraft({ title, content });
-  }, [title, content, setDraft]);
+    if (isEditMode && editReport && !isEditDataLoaded) {
+      reset({
+        title: editReport.title || defaultTitle,
+        content: editReport.content || "",
+      });
+      setIsEditDataLoaded(true);
+    }
+  }, [isEditMode, editReport, reset, defaultTitle, isEditDataLoaded]);
+
+  // 초안 자동 저장 (수정 모드가 아닐 때만)
+  useEffect(() => {
+    if (!isEditMode) {
+      setDraft({ title, content });
+    }
+  }, [title, content, setDraft, isEditMode]);
 
   // 이전 보고 불러오기 파라미터 처리
   useEffect(() => {
@@ -116,20 +175,38 @@ function DailyReportNewContent() {
       // AI 키워드 추출
       const keywords = await extractKeywordsAsync(data.content);
 
-      // 노션 데이터베이스에 보고서 저장
-      const report = await submitReport({
-        type: "daily",
-        title: data.title,
-        content: data.content,
-        keywords,
-        status: "submitted",
-      });
+      let report: Report;
+
+      if (isEditMode && editId) {
+        // 수정 모드: 기존 보고서 업데이트
+        report = await updateReport(editId, {
+          title: data.title,
+          content: data.content,
+          keywords,
+          status: "submitted",
+        });
+      } else {
+        // 새 보고서 작성
+        report = await submitReport({
+          type: "daily",
+          session: sessionParam || undefined,
+          title: data.title,
+          content: data.content,
+          keywords,
+          status: "submitted",
+        });
+      }
 
       // 캐시 무효화 (홈 화면에서 새 데이터 표시)
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ["report", editId] });
+      }
 
       setSubmittedReport(report);
-      clearDraft();
+      if (!isEditMode) {
+        clearDraft();
+      }
 
       router.push("/reports/daily/complete");
     } catch (error) {
@@ -143,9 +220,21 @@ function DailyReportNewContent() {
     }
   };
 
+  // 수정 모드에서 데이터 로딩 중
+  if (isEditMode && isLoadingEdit) {
+    return (
+      <div className="min-h-screen bg-white">
+        <PageHeader title="보고서 불러오는 중..." />
+        <div className="flex justify-center items-center py-20">
+          <SpinLoading color="primary" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white">
-      <PageHeader title="1일 보고 작성" />
+      <PageHeader title={isEditMode ? "보고서 수정" : "1일 보고 작성"} />
 
       {/* 작성 폼 */}
       <div className="px-4 py-4 page-content">
@@ -245,7 +334,7 @@ function DailyReportNewContent() {
             type: "default",
           },
           {
-            label: isSubmitting ? "제출 중..." : "제출하기",
+            label: isSubmitting ? (isEditMode ? "수정 중..." : "제출 중...") : (isEditMode ? "수정하기" : "제출하기"),
             onClick: handleSubmit(onSubmit),
             type: "primary",
             disabled: !isValid || isSubmitting,

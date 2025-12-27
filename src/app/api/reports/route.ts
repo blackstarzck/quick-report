@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { type, title, content, keywords, status } = body;
+    const { type, session, title, content, keywords, status } = body;
 
     if (!type || !title || !content) {
       return NextResponse.json(
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
 
     const report = await createReport({
       type,
+      session,
       title,
       content,
       keywords: keywords || [],

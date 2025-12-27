@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>
+      <body className="font-sans">
         <Providers>
           <div className="min-h-screen max-w-md mx-auto bg-white shadow-lg">
             {children}

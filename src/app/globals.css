@@ -1,4 +1,4 @@
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+@import "./fonts.css";
 
 @tailwind base;
 @tailwind components;
@@ -15,8 +15,9 @@
   --adm-color-fill-content: #f9fafb;
   --adm-color-border: #e5e7eb;
   --adm-border-radius: 12px;
-  --adm-font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-  
+  --adm-font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui,
+    Roboto, sans-serif;
+
   --color-bg: #ffffff;
   --color-bg-secondary: #f8fafc;
   --color-accent: #2563eb;
@@ -97,4 +98,3 @@ body {
 .safe-area-top {
   padding-top: max(12px, env(safe-area-inset-top));
 }
-
